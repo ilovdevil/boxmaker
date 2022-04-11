@@ -1,0 +1,603 @@
+<html>
+<head>
+<title>BoxMaker</title>
+<style type="text/css">
+    #piece { height:20px; width:20px; }
+    #target { height:20px; width:18px; }
+</style>
+
+<script src="basic.js" charset="UTF-8"></script>
+<script type="text/javascript">
+var ALLOW_TERM          = 8;
+var MAX_PIECES          = 9;
+var PIECE_IMG           = [
+    "piece_1.png",  "piece_2.png",  "piece_3.png",  "piece_4.png",  "piece_1.png",
+    "piece_6.png",  "piece_7.png",  "piece_8.png",  "piece_9.png"
+];
+
+var gnZIndex            = 100;
+var dragItem            = "";
+var gnMouseLeft         = 0;
+var gnMouseTop          = 0;
+var ganData             = "";
+var gaMatrix            = "";
+var gtTimer             = [];
+var gnMatrixLeft        = 0;
+var gnMatrixTop         = 0;
+
+function nInit()
+{
+    var o = document.getElementById("level");
+    var nLevel = o.options[o.selectedIndex].value;
+
+    gnZIndex        = 100;
+    dragItem        = "";
+    gnMouseLeft     = 0;
+    gnMouseTop      = 0;
+    ganData         = "";
+    gaMatrix        = "";
+    gnMatrixLeft    = 0;
+    gnMatrixTop     = 0;
+
+    for( var i=0; i<MAX_PIECES; i++ ) {
+        if( gtTimer[i] ) {
+            clearInterval( gtTimer[i] );
+            gtTimer[i] = null;
+        }
+    }
+
+    for( var i=1; i<=MAX_PIECES; i++ ) {
+        o = document.getElementById("piece_" + i);
+        o.innerHTML = "";
+        o.style.top = "70px";
+        o.style.left = (100 + (i-1)*70) + "px";
+    }
+
+    if( nLevel == 0 ) {
+        while( genData() == false );
+    }
+    else {
+        console.log( PROGRAM_PATH + "/data/boxmaker_" + nLevel + ".sql" );
+        ganData = getFile( PROGRAM_PATH + "/data/boxmaker_" + nLevel + ".sql", "\n", "|" );
+    }
+
+    vDrawBox();
+    vDrawPiece();
+}
+
+function genData()
+{
+    var nPiece;
+
+    var nRow = 4 + parseInt(Math.random()*3);
+    var nCol = 4 + parseInt(Math.random()*4);
+
+    while( 1 ) {
+        nPiece = 4 + parseInt(Math.random()*5);
+        if( (nRow*nCol) / nPiece / 1.0 >= 4  &&  (nRow*nCol) / nPiece / 1.0 <= 9 )
+            break;
+        //console.log( "nPiece = " + nPiece );
+    }
+
+    ganData = new Array( nRow );
+    for( var i=0; i<nRow; i++ ) {
+        ganData[i] = new Array( nCol );
+        for( var j=0; j<nCol; j++ ) 
+            ganData[i][j] = 0;
+    }
+
+    var nAvg = (nRow*nCol) / nPiece;
+    console.log( "nRow = " + nRow + " , nCol = " + nCol + " , PIECE = " + nPiece + " , AVG = " + nAvg );
+
+    var nCount;
+    var x, y;
+    for( var i=0; i<nPiece-1; i++ ) {
+        // 시작점
+        x = y = -1;
+        for( var j=0; j<nRow; j++ ) {
+            for( var k=0; k<nCol; k++ ) {
+                if( ganData[j][k] == 0 ) {
+                    y = j; x = k;
+                    break;
+                }
+            }
+            if( y >= 0 )  break;
+        }
+
+        nCount = parseInt(nAvg*0.75+0.5) + parseInt( Math.random() * parseInt(nAvg*0.5+1.5) );
+
+        console.log( i + " : nCount=" + nCount + ", y=" + y + ", x=" + x );
+
+        ganData[y][x] = i+1;
+        var nRepeat = 0;
+        for( j=1; j<nCount; j++ ) {
+            nRepeat++;
+            if( nRepeat > 500 )
+                return false;
+            
+                nDirection = parseInt( Math.random() * 4 );
+                if( nDirection == 0 ) {
+                    if( y == 0  ||  ganData[y-1][x] != 0 ) { j--; continue; }
+                    else y--;
+                }
+                else if( nDirection == 1 ) {
+                    if( x == nCol-1  ||  ganData[y][x+1] != 0 ) { j--; continue; }
+                    else x++;
+                }
+                else if( nDirection == 2 ) {
+                    if( y == nRow-1  ||  ganData[y+1][x] != 0 ) { j--; continue; }
+                    else y++;
+                }
+                else if( nDirection == 3 ) {
+                    if( x == 0  ||  ganData[y][x=1] != 0 ) { j--; continue; }
+                    else x--;
+                }
+
+                console.log( i + "-" + j + " : y=" + y + ", x=" + x );
+                ganData[y][x] = i+1;
+        }
+    }
+
+    var nFillNo = nPiece;
+    // 빈공간 매꾸기
+    for( var i=0; i<ganData.length; i++ ) {
+        for( var j=0; j<ganData[i].length; j++ ) {
+            if( ganData[i][j] == 0 ) {
+                if( nFillNo < MAX_PIECES ) {
+                    console.log( "fillData : " + nFillNo );
+                    fillData( i, j, nFillNo );
+                    nFillNo ++;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+    }
+
+
+    var log;
+    for( var i=0; i<ganData.length; i++ ) {
+        log = "";
+        for( var j=0; j<ganData[i].length; j++ ) {
+            log += ganData[i][j] + " | ";
+        }
+        console.log( log );
+    }
+    console.log( "" );
+    return true;
+}
+
+function fillData( y, x, no )
+{
+    ganData[y][x] = no;
+
+    if( x > 0  &&  ganData[y][x-1] == 0 )  fillData( y, x-1, no );
+    if( x < ganData[0].length-1  &&  ganData[y][x+1] == 0 )  fillData( y, x+1, no );
+    if( y > 0  &&  ganData[y-1][x] == 0 )  fillData( y-1, x, no );
+    if( y < ganData.length-1  &&  ganData[y+1][x] == 0 )  fillData( y+1, x, no );
+}
+
+function vDrawBox()
+{
+    var nRow = ganData.length; 
+    var nCol = ganData[0].length;
+    var szBox = "";
+    var o = document.getElementById("box");
+
+    szBox = "<table border=1 cellspacing=0 cellpadding=0>";
+    for( var i=0; i<nRow; i++ ) {
+        szBox += "<tr>";
+        for( var j=0; j<nCol; j++ ) {
+            szBox += "<td id=target> </td>";
+        }
+        szBox += "</tr>";
+    }
+    szBox += "</table>";
+    o.innerHTML = szBox;
+
+    gaMatrix = new Array( nRow );
+    for( var i=0; i<gaMatrix.length; i++ ) {
+        gaMatrix[i] = new Array( nCol );
+        for( var j=0; j<gaMatrix[i].length; j++ ) {
+            gaMatrix[i][j] = 0;
+        }
+    }
+
+    gnMatrixLeft = nGetAbsLeft(o);
+    gnMatrixTop = nGetAbsTop(o);
+    console.log( "MATRIX : " + gnMatrixLeft + " , " + gnMatrixTop );
+}
+
+function vDrawPiece()
+{
+    var i, j, k;
+    var szPiece;
+    var nMinRow, nMaxRow, nMinCol, nMaxCol;
+    var nRow = ganData.length;
+    var nCol = ganData[0].length;
+
+    for( i=1; i<=MAX_PIECES; i++ ) {
+        nMinRow = nMinCol = 999;
+        nMaxRow = nMaxCol = -1;
+        szPiece = "";
+
+        for( j=0; j<nRow; j++ ) {
+            for( k=0; k<nCol; k++ ) {
+                if( ganData[j][k] == i ) {
+                    if( nMinRow > j )  nMinRow = j;
+                    if( nMaxRow < j )  nMaxRow = j;
+                    if( nMinCol > k )  nMinCol = k;
+                    if( nMaxCol < k )  nMaxCol = k;
+                }
+            }
+        }
+
+        if( nMaxRow == -1 ) {
+            break;
+        }
+
+        szPiece += "<table border=0 cellspacing=0 cellpadding=0>";
+        for( j=nMinRow; j<=nMaxRow; j++ ) {
+            szPiece += "<tr>";
+            for( k=nMinCol; k<=nMaxCol; k++ ) {
+                if( ganData[j][k] == i )
+                    szPiece += "<td><img id='piece' src='" + PROGRAM_PATH + "/images/" + PIECE_IMG[i-1] + "'></td>";
+                else
+                    szPiece += "<td id='piece'>&nbsp;</td>";
+            }
+            szPiece += "</tr>";
+        }
+        szPiece += "</table>";
+
+        document.getElementById("piece_"+i).innerHTML = szPiece;
+    }
+}
+
+function nGetAbsLeft( o ) 
+{
+    nLeft = o.offsetLeft;
+    while( o.offsetParent != null ) {
+        oParent = o.offsetParent;
+        nLeft  += oParent.offsetLeft;
+        o       = oParent;
+    }
+
+    return nLeft;
+}
+
+function nGetAbsTop( o ) 
+{
+    oTop = o.offsetTop;
+    while( o.offsetParent != null ) {
+        oParent = o.offsetParent;
+        oTop   += oParent.offsetTop;
+        o       = oParent;
+    }
+
+    return oTop;
+}
+
+function vSetLeft( o, oLeft ) 
+{
+    o.style.left = oLeft + "px";
+}
+
+function vSetTop( o, oTop )
+{
+    o.style.top = oTop + "px";
+}
+
+function vSetPosition( o, oLeft, oTop )
+{
+    vSetLeft( o, oLeft );
+    vSetTop( o, oTop );
+}
+
+function vMouseDown( e, src ) 
+{
+    if( !e ) { e = window.event }
+
+    dragItem    = src;
+    o           = document.getElementById(src);
+    nLeft       = nGetAbsLeft(o);
+    nTop        = nGetAbsTop(o);
+    gnMouseLeft = e.clientX - nLeft;
+    gnMouseTop  = e.clientY - nTop;
+    o.style.zIndex = ++gnZIndex;
+}
+
+function vMouseMove( e )
+{
+    if( !e ) { e = window.event }
+
+    if( dragItem ) {
+        o = document.getElementById(dragItem);
+        vSetPosition( o, e.clientX-gnMouseLeft, e.clientY-gnMouseTop );
+        return false;
+    }
+}
+
+function vMouseUp( e, src )
+{
+    var nRow = ganData.length;
+    var nCol = ganData[0].length;
+
+    dragItem    = "";
+    o           = document.getElementById(src);
+    nLeft       = nGetAbsLeft(o);
+    nTop        = nGetAbsTop(o);
+
+    for( var i=0; i<nRow; i++ ) {
+        for( var j=0; j<nCol; j++ ) {
+            // 세로축
+            if( i*20+gnMatrixTop-ALLOW_TERM <= nTop  &&  i*20+gnMatrixTop+ALLOW_TERM >= nTop ) {
+                // 가로축
+                if( j*20+gnMatrixLeft-ALLOW_TERM <= nLeft  &&  j*20+gnMatrixLeft+ALLOW_TERM >= nLeft ) {
+                    o.style.top = (i*20+gnMatrixTop+1) + "px";
+                    o.style.left = (j*20+gnMatrixLeft+1) + "px";
+                }
+            }
+        }
+    }
+
+    // 완료여부 체크
+    var bMatch = true;
+    for( i=1; i<=MAX_PIECES; i++ ) {
+        o = document.getElementById("piece_"+i);
+        nLeft = nGetAbsLeft(o);
+        nTop = nGetAbsTop(o);
+
+        nMinRow = nMinCol = 999;
+        nMaxRow = nMaxCol = -1;
+        szPiece = "";
+
+        for( j=0; j<nRow; j++ ) {
+            for( k=0; k<nCol; k++ ) {
+                if( ganData[j][k] == i ) {
+                    if( nMinRow > j )  nMinRow = j;
+                    if( nMaxRow < j )  nMaxRow = j;
+                    if( nMinCol > k )  nMinCol = k;
+                    if( nMaxCol < k )  nMaxCol = k;
+                }
+            }
+        }
+
+        if( nMaxRow == -1 ) {
+            break;
+        }
+
+        if( nTop < gnMatrixTop  ||  nLeft < gnMatrixLeft  ||
+            nTop > gnMatrixTop+(gaMatrix.length*20)  ||  nLeft > gnMatrixLeft+(gaMatrix[0].length*20)) {
+            bMatch = false;
+            break;
+        }
+
+        var nCalcLeft;
+        var nCalcTop;
+        for( j=nMinRow; j<=nMaxRow; j++ ) {
+            for( k=nMinCol; k<=nMaxCol; k++ ) {
+                if( ganData[j][k] == i ) {
+                    nCalcLeft = nLeft + ((k-nMinCol)*20);
+                    nCalcTop = nTop + ((j-nMinRow)*20);
+                    console.log( "piece_" + i + " : TOP=" + nCalcTop + " , LEFT=" + nCalcLeft );
+
+                    if( nCalcTop < gnMatrixTop  ||  nCalcLeft < gnMatrixLeft  ||
+                        nCalcTop > gnMatrixTop+(gaMatrix.length*20)  ||  nCalcLeft > gnMatrixLeft+(gaMatrix[0].length*20)) {
+                        bMatch = false;
+                        break;
+                    }
+                    nCalcTop -= 1;
+                    nCalcLeft -= 1;
+
+                    if( (nCalcTop-gnMatrixTop)/20 >= 0  &&  (nCalcTop-gnMatrixTop)/20 < gaMatrix.length ) {
+                        if( (nCalcLeft-gnMatrixLeft)/20 >= 0  &&  (nCalcLeft-gnMatrixLeft)/20 < gaMatrix[0].length ) {
+                            if( (nCalcTop-gnMatrixTop)/20 != parseInt((nCalcTop-gnMatrixTop)/20)  ||
+                                (nCalcLeft-gnMatrixLeft)/20 != parseInt((nCalcLeft-gnMatrixLeft)/20) ) {
+                                // 칸에 정확하게 매치하지 않은 경우, 즉 여러 칸에 걸쳐 있는 경우
+                                bMatch = false;
+                                break;
+                            }
+                            gaMatrix [(nCalcTop-gnMatrixTop)/20] [(nCalcLeft-gnMatrixLeft)/20] = i;
+                        }
+                        else { bMatch = false; break; }
+                    }
+                    else { bMatch = false; break; }
+                }
+            }
+            if( bMatch == false )
+                break;
+        }
+
+        //break;
+    }
+
+    var log;
+    for( var i=0; i<gaMatrix.length; i++ ) {
+        log = "";
+        for( var j=0; j<gaMatrix[i].length; j++ ) {
+            log += gaMatrix[i][j] + " | ";
+        }
+        console.log( log );
+    }
+
+    if( bMatch ) {
+        bMatch = true;
+        for( var i=0; i<gaMatrix.length; i++ ) {
+            for( var j=0; j<gaMatrix[i].length; j++ ) {
+                if( gaMatrix[i][j] == 0 ) {
+                    bMatch = false;
+                    break;
+                }
+            }
+        }
+        if( bMatch == true ) {
+            alert( "성공" );
+            nInit();
+        }
+    }
+
+    for( var i=0; i<gaMatrix.length; i++ ) {
+        for( var j=0; j<gaMatrix[i].length; j++ ) {
+            gaMatrix[i][j] = 0;
+        }
+    }
+}
+
+var gSavePosition = [];
+function vShowHint()
+{
+    var nRow = ganData.length;
+    var nCol = ganData[0].length;
+    var szHint = "";
+    var o = document.getElementById("hint");
+
+    szHint = "<table border=1 cellspacing=0 cellpadding=0>";
+    for( var i=0; i<nRow; i++ ) {
+        szHint += "<tr>";
+            for( var j=0; j<nCol; j++ ) {
+                //szHint += "<td id=target><img id='piece' src='" + PROGRAM_PATH + "/images/" + PIECE_IMG[ganData[i][j]-1] + "'> </td>";
+                szHint += "<td id=target> </td>";
+            }
+            szHint += "</tr>";
+    }
+    szHint += "</table>";
+    o.innerHTML = szHint;
+
+    o.style.display = "";
+
+    gSavePosition = [];
+    var minX, minY, bFound;
+    for( var k=0; k<MAX_PIECES; k++ ) {
+        minY = minX = 99;
+        bFound = false;
+        for( var i=0; i<nRow; i++ ) {
+            for( var j=0; j<nCol; j++ ) {
+                if( ganData[i][j] == (k+1) ) {
+                    if( minX > j ) {
+                        minX = j;
+                        bFound = true;
+                        break;
+                    }
+                }
+            }
+            if( bFound  &&  minY > i ) {
+                minY = i;
+            }
+        }
+
+        gSavePosition[k] = {};
+        gSavePosition[k].left = document.getElementById("piece_" + (k+1)).style.left;
+        gSavePosition[k].top = document.getElementById("piece_" + (k+1)).style.top;
+
+        if( minX != 99 ) {
+            gtTimer[k] = setInterval( "move(" + (k+1) + "," + parseInt(parseInt(o.style.left)+parseInt(minX*20)+1) + "," + parseInt(parseInt(o.style.top)+parseInt(minY*20)+1) + ")", 1+parseInt(Math.random()*6) );
+        }
+    }
+
+    //setTimeout( "document.getElementById('hint').style.display='none';", 1000 );
+    setTimeout( vHideHint, 3000 );
+}
+
+function vHideHint()
+{
+    document.getElementById("hint").style.display = "none";
+
+    var o;
+    for( var i=0; i<MAX_PIECES; i++ ) {
+        o = document.getElementById("piece_"+(i+1));
+        o.style.left = gSavePosition[i].left;
+        o.style.top = gSavePosition[i].top;
+    }
+}
+
+function move( piece, endX, endY )
+{
+    var o = document.getElementById("piece_" + piece);
+    var startX = parseInt(o.style.left);
+    var startY = parseInt(o.style.top);
+    var dx = Math.abs( endX - startX );
+    var dy = Math.abs( endY - startY );
+//console.log( startX + " , " + startY + " , "  + endX + " , " + endY );
+
+    if( startX == endX  &&  startY == endY ) {
+        clearInterval( gtTimer[piece-1] );
+        return;
+    }
+
+    if( dy <= dx ) {
+        var p = 2 * (dy - dx);
+        var y = startY;
+
+        var incX = 1;
+        if( endX < startX )
+            incX = -1;
+        
+        var incY = 1;
+        if( endY < startY )
+            incY = -1;
+        
+        for( var x=startX; (startX <= endX ? x <= endX : x >= endX); x=incX ) {
+            if( 0 >= p )
+                p += 2 * dy;
+            else {
+                p += 2 * (dy - dx);
+                y += incY;
+            }
+            vSetPosition( o, x, y );
+            if( x != startX  ||  y != startY )
+                break;
+        }
+    }
+    else {
+        var p = 2 * (dx - dy);
+        var x = startX;
+
+        var incX = 1;
+        if( endX < startX )
+            incX = -1;
+
+        var incY = 1;
+        if( endY < startY )
+            incY = -1;
+        
+        for( var y=startY; (startY <= endY ? y <= endY : y >= endY); y+=incY ) {
+            if( 0 >= p )
+                p += 2 * dx;
+            else {
+                p += 2 * (dx - dy);
+                x += incX;
+            }
+            vSetPosition( o, x, y );
+            if( x != startX  ||  y != startY )
+                break;
+        }
+    }
+}
+
+document.onmousemove = vMouseMove;
+</script>
+</head>
+
+<body onLoad="nInit()"">
+<div id="piece_1" style="position:absolute; top:70px; left:100px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_1')" onmouseup="vMouseUp(event,'piece_1')"></div>
+<div id="piece_2" style="position:absolute; top:70px; left:170px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_2')" onmouseup="vMouseUp(event,'piece_2')"></div>
+<div id="piece_3" style="position:absolute; top:70px; left:240px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_3')" onmouseup="vMouseUp(event,'piece_3')"></div>
+<div id="piece_4" style="position:absolute; top:70px; left:310px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_4')" onmouseup="vMouseUp(event,'piece_4')"></div>
+<div id="piece_5" style="position:absolute; top:70px; left:380px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_5')" onmouseup="vMouseUp(event,'piece_5')"></div>
+<div id="piece_6" style="position:absolute; top:70px; left:450px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_6')" onmouseup="vMouseUp(event,'piece_6')"></div>
+<div id="piece_7" style="position:absolute; top:70px; left:520px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_7')" onmouseup="vMouseUp(event,'piece_7')"></div>
+<div id="piece_8" style="position:absolute; top:70px; left:590px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_8')" onmouseup="vMouseUp(event,'piece_8')"></div>
+<div id="piece_9" style="position:absolute; top:70px; left:660px; cursor:hand; z-index:100" onmousedown="vMouseDown(event,'piece_9')" onmouseup="vMouseUp(event,'piece_9')"></div>
+
+<div id="box" style="position:absolute; top:200px; left:100px; z-index:1"></div>
+<select id="level" onChange="nInit()">
+    <option value="0" selected>Random</option>
+    <option value="1">Level 1</option>
+    <option value="2">Level 2</option>
+    <option value="3">Level 3</option>
+</select>
+<button onClick="vShowHint()">힌트</button>
+<div id="hint" style="position:absolute; top:200px; left:400px; z-index:1"></div>
+</body>
+</html>
